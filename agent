@@ -20,7 +20,11 @@ case "$1" in
   logs)
     cat "$BASE/logs/scheduler.log"
     ;;
-
+  work)
+    cd "$BASE"
+    . .venv/bin/activate
+    python work_job_agent.py
+    ;;
   *)
     echo "Usage:"
     echo "  agent add     - add reminder with AI"
