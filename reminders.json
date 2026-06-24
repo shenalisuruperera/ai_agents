@@ -1,0 +1,15 @@
+[
+  {
+    "task": "Call the supplier",
+    "date": "2026-06-25",
+    "time": "09:00",
+    "notes": "about the invoice"
+  },
+  {
+    "task": "Test reminder notification",
+    "date": "2026-06-24",
+    "time": "10:54",
+    "notes": "This proves the reminder agent works",
+    "done": true
+  }
+]
