@@ -1,0 +1,31 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+BASE="/data/data/com.termux/files/home/ai_agents"
+
+case "$1" in
+  add)
+    cd "$BASE"
+    . .venv/bin/activate
+    python ai_reminder_agent.py
+    ;;
+
+  list)
+    python "$BASE/list_reminders.py"
+    ;;
+
+  check)
+    "$BASE/run_reminder_check.sh"
+    ;;
+
+  logs)
+    cat "$BASE/logs/scheduler.log"
+    ;;
+
+  *)
+    echo "Usage:"
+    echo "  agent add     - add reminder with AI"
+    echo "  agent list    - list reminders"
+    echo "  agent check   - check due reminders now"
+    echo "  agent logs    - show scheduler logs"
+    ;;
+esac

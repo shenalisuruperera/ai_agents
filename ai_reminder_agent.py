@@ -6,7 +6,14 @@ from datetime import datetime
 
 BASE_DIR = Path.home() / "ai_agents"
 MEMORY_FILE = BASE_DIR / "reminders.json"
+ENV_FILE = BASE_DIR / ".env"
 
+def load_env():
+    if ENV_FILE.exists():
+        for line in ENV_FILE.read_text().splitlines():
+            if "=" in line and not line.strip().startswith("#"):
+                key, value = line.split("=", 1)
+                os.environ[key.strip()] = value.strip()
 
 def load_reminders():
     if not MEMORY_FILE.exists():
@@ -30,6 +37,7 @@ def extract_output_text(data):
 
 
 def ask_ai(user_text):
+    load_env()
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is missing")
