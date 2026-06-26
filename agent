@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-BASE="/data/data/com.termux/files/home/ai_agents"
+BASE="$HOME/ai_agents"
 
 case "$1" in
   add)

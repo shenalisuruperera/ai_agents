@@ -1,5 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/bash
-cd /data/data/com.termux/files/home/ai_agents
+
+BASE="$HOME/ai_agents"
+cd "$BASE" || exit 1
 
 echo "Job ran at $(date)" >> logs/scheduler.log
 
