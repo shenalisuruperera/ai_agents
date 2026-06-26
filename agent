@@ -6,11 +6,11 @@ case "$1" in
   add)
     cd "$BASE"
     . .venv/bin/activate
-    python ai_reminder_agent.py
+    python reminder/ai_reminder_agent.py
     ;;
 
   list)
-    python "$BASE/list_reminders.py"
+    python "$BASE/reminder/list_reminders.py"
     ;;
 
   check)
@@ -20,16 +20,19 @@ case "$1" in
   logs)
     cat "$BASE/logs/scheduler.log"
     ;;
+
   work)
     cd "$BASE"
     . .venv/bin/activate
-    python work_job_agent.py
+    python work/work_job_agent.py
     ;;
+
   *)
     echo "Usage:"
     echo "  agent add     - add reminder with AI"
     echo "  agent list    - list reminders"
     echo "  agent check   - check due reminders now"
     echo "  agent logs    - show scheduler logs"
+    echo "  agent work    - manually add work job"
     ;;
 esac

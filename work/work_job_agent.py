@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 BASE = Path.home() / "ai_agents"
-WORK_DIR = BASE / "work_messages"
+WORK_DIR = BASE / "work" / "data"
 JOBS_FILE = WORK_DIR / "jobs.json"
 LOCATIONS_FILE = WORK_DIR / "known_locations.json"
 
@@ -117,41 +117,47 @@ def parse_job(text):
         "created_at": datetime.now().isoformat(timespec="seconds")
     }
 
-
-print("Paste the WhatsApp job message.")
-print("When finished, type END on a new line.\n")
-
-lines = []
-while True:
-    line = input()
-    if line.strip().upper() == "END":
-        break
-    lines.append(line)
-
-message = "\n".join(lines)
-job = parse_job(message)
-
-print("\n--- Confirm extracted job ---")
-job["date"] = ask_edit("Date", job["date"])
-job["start_time"] = ask_edit("Start time", job["start_time"])
-job["address"] = ask_edit("Address", job["address"])
-job["job_type"] = ask_edit("Job type", job["job_type"])
-
-print("\n--- Original message ---")
-print(message)
-
-print("\n--- Final job record ---")
-print(json.dumps(job, indent=2))
-
-confirm = input("\nSave this job? y/n: ").strip().lower()
-
-if confirm == "y":
+def save_job(job):
     jobs = load_json(JOBS_FILE, [])
     jobs.append(job)
     save_json(JOBS_FILE, jobs)
 
-    maybe_add_location_keyword(job["address"])
 
-    print("Saved job.")
-else:
-    print("Not saved.")
+def interactive_main():
+    print("Paste the WhatsApp job message.")
+    print("When finished, type END on a new line.\n")
+
+    lines = []
+    while True:
+        line = input()
+        if line.strip().upper() == "END":
+            break
+        lines.append(line)
+
+    message = "\n".join(lines)
+    job = parse_job(message)
+
+    print("\n--- Confirm extracted job ---")
+    job["date"] = ask_edit("Date", job["date"])
+    job["start_time"] = ask_edit("Start time", job["start_time"])
+    job["address"] = ask_edit("Address", job["address"])
+    job["job_type"] = ask_edit("Job type", job["job_type"])
+
+    print("\n--- Original message ---")
+    print(message)
+
+    print("\n--- Final job record ---")
+    print(json.dumps(job, indent=2))
+
+    confirm = input("\nSave this job? y/n: ").strip().lower()
+
+    if confirm == "y":
+        save_job(job)
+        maybe_add_location_keyword(job["address"])
+        print("Saved job.")
+    else:
+        print("Not saved.")
+
+
+if __name__ == "__main__":
+    interactive_main()

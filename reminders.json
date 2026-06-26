@@ -3,7 +3,8 @@
     "task": "Call the supplier",
     "date": "2026-06-25",
     "time": "09:00",
-    "notes": "about the invoice"
+    "notes": "about the invoice",
+    "done": true
   },
   {
     "task": "Test reminder notification",
@@ -23,12 +24,49 @@
     "task": "Test the agent command",
     "date": "2026-06-25",
     "time": "10:00",
-    "notes": null
+    "notes": null,
+    "done": true
   },
   {
     "task": "test env loading",
     "date": "2026-06-25",
     "time": "11:00",
-    "notes": null
+    "notes": null,
+    "done": true
+  },
+  {
+    "task": "Leave for work: 687 Doncaster Rd, Doncaster",
+    "date": "2026-06-27",
+    "time": "05:50",
+    "notes": "RX Labour job starts at 07:00. Travel estimate: 40 min + 30 min buffer.",
+    "done": false
+  },
+  {
+    "task": "Leave for work: 687 Doncaster Rd, Doncaster",
+    "date": "2026-06-27",
+    "time": "05:50",
+    "notes": "RX Labour job starts at 07:00. Travel estimate: 40 min + 30 min buffer.",
+    "done": false
+  },
+  {
+    "task": "Leave for work: 687 Doncaster Rd, Doncaster",
+    "date": "2026-06-27",
+    "time": "05:50",
+    "notes": "RX Labour starts at 07:00. Travel 40 min + 30 min buffer.",
+    "done": false
+  },
+  {
+    "task": "Leave for work: 687 Doncaster Rd, Doncaster",
+    "date": "2026-06-27",
+    "time": "05:50",
+    "notes": "RX Labour starts at 07:00. Travel 40 min + 30 min buffer.",
+    "done": false
+  },
+  {
+    "task": "Leave for work: 687 Doncaster Rd, Doncaster",
+    "date": "2026-06-27",
+    "time": "05:50",
+    "notes": "RX Labour starts at 07:00. Travel 40 min + 30 min buffer.",
+    "done": false
   }
 ]
