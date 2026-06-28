@@ -5,7 +5,7 @@ from datetime import datetime
 
 MEMORY_FILE = Path.home() / "ai_agents" / "reminders.json"
 
-reminders = json.loads(MEMORY_FILE.read_text())
+reminders = json.loads(MEMORY_FILE.read_text()) if MEMORY_FILE.exists() else []
 now = datetime.now()
 updated = []
 
