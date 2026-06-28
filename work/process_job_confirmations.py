@@ -14,6 +14,7 @@ SHARED = Path.home() / "storage/shared/AI_Agents"
 PENDING = SHARED / "pending_job.json"
 DISPLAY = SHARED / "pending_job_display.txt"
 ALARM_REQUEST = SHARED / "alarm_request.txt"
+EDIT_REQUEST = SHARED / "edit_request.txt"
 CONFIRM = SHARED / "confirm.flag"
 REJECT = SHARED / "reject.flag"
 
@@ -31,8 +32,53 @@ def save_json(path, data):
 def cleanup():
     PENDING.unlink(missing_ok=True)
     DISPLAY.unlink(missing_ok=True)
+    EDIT_REQUEST.unlink(missing_ok=True)
     CONFIRM.unlink(missing_ok=True)
     REJECT.unlink(missing_ok=True)
+
+
+def load_edits():
+    edits = {}
+    if not EDIT_REQUEST.exists():
+        return edits
+
+    for line in EDIT_REQUEST.read_text().splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            edits[key.strip()] = value.strip()
+
+    return edits
+
+
+def apply_edits(job):
+    edits = load_edits()
+
+    if "date" in edits and edits["date"]:
+        job["date"] = edits["date"]
+
+    if "start_time" in edits and edits["start_time"]:
+        job["start_time"] = edits["start_time"]
+
+    if "address" in edits and edits["address"]:
+        job["address"] = edits["address"]
+
+    if "job_type" in edits and edits["job_type"]:
+        job["job_type"] = edits["job_type"]
+
+    if edits:
+        job["edited_at"] = datetime.now().isoformat(timespec="seconds")
+        job["edits_applied"] = edits
+
+    return job
+
+
+def same_job(a, b):
+    return (
+        a.get("date") == b.get("date")
+        and a.get("start_time") == b.get("start_time")
+        and a.get("address", "").strip().lower() == b.get("address", "").strip().lower()
+        and a.get("job_type", "").strip().lower() == b.get("job_type", "").strip().lower()
+    )
 
 
 def create_alarm_request(job):
@@ -75,28 +121,54 @@ def create_alarm_request(job):
     save_json(REMINDERS_FILE, reminders)
 
 
-if CONFIRM.exists():
+def confirm_pending(reason):
     pending = load_json(PENDING, {})
-
     pending_items = pending if isinstance(pending, list) else [pending]
+
     jobs = load_json(JOBS_FILE, [])
+    added = 0
 
     for item in pending_items:
         job = item.get("job", item)
+        job = apply_edits(job)
+
+        if any(same_job(existing, job) for existing in jobs):
+            print(f"Already saved, skipped: {job.get('start_time')} {job.get('address')}")
+            continue
+
         job["confirmed_at"] = datetime.now().isoformat(timespec="seconds")
+        job["confirmation_reason"] = reason
         jobs.append(job)
         create_alarm_request(job)
+        added += 1
 
     save_json(JOBS_FILE, jobs)
     cleanup()
 
-    print(f"Confirmed {len(pending_items)} job(s) and created alarm request.")
+    print(f"Confirmed {added} job(s). Reason: {reason}")
+
+
+if CONFIRM.exists():
+    confirm_pending("manual_or_edited")
     raise SystemExit
 
 
 if REJECT.exists():
     cleanup()
     print("Rejected pending job(s).")
+    raise SystemExit
+
+
+if PENDING.exists():
+    pending = load_json(PENDING, {})
+    item = pending[0] if isinstance(pending, list) else pending
+    expires_at = item.get("expires_at")
+
+    if expires_at and datetime.now() >= datetime.fromisoformat(expires_at):
+        confirm_pending("auto_timeout")
+        raise SystemExit
+
+    print("Pending job exists, waiting for confirmation.")
     raise SystemExit
 
 

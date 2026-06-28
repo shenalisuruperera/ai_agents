@@ -1,4 +1,21 @@
+# Python
 .venv/
-.env
 __pycache__/
 *.pyc
+
+# Secrets
+.env
+
+# Runtime data
+logs/
+reminders.json
+
+# Generated work data
+work/data/jobs.json
+work/data/travel_cache.json
+work/data/imported_messages.txt
+
+# Old folders
+archive/
+backup/
+work_messages/

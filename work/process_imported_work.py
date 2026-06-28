@@ -6,11 +6,44 @@ from datetime import datetime, timedelta
 from work_job_agent import parse_job
 
 BASE = Path.home() / "ai_agents"
-IMPORTED = BASE / "work" / "data" / "imported_messages.txt"
+WORK = BASE / "work" / "data"
+IMPORTED = WORK / "imported_messages.txt"
+JOBS_FILE = WORK / "jobs.json"
 
 SHARED = Path.home() / "storage/shared/AI_Agents"
 PENDING = SHARED / "pending_job.json"
 DISPLAY = SHARED / "pending_job_display.txt"
+
+
+def load_json(path, default):
+    if not path.exists():
+        return default
+    return json.loads(path.read_text())
+
+
+def same_job(a, b):
+    return (
+        a.get("date") == b.get("date")
+        and a.get("start_time") == b.get("start_time")
+        and a.get("address", "").strip().lower() == b.get("address", "").strip().lower()
+        and a.get("job_type", "").strip().lower() == b.get("job_type", "").strip().lower()
+    )
+
+
+def job_already_exists(job):
+    jobs = load_json(JOBS_FILE, [])
+
+    for existing in jobs:
+        if same_job(existing, job):
+            return True
+
+    if PENDING.exists():
+        pending = load_json(PENDING, {})
+        pending_job = pending.get("job", pending)
+        if same_job(pending_job, job):
+            return True
+
+    return False
 
 
 def notify_pending(job):
@@ -48,31 +81,39 @@ if not text:
 
 parts = [p.strip() for p in text.split("---") if p.strip()]
 
-saved_pending = 0
+pending_count = 0
+duplicate = 0
 uncertain = 0
 
 for part in parts:
     job = parse_job(part)
 
-    if job["start_time"] and job["address"]:
-        pending_item = {
-            "status": "pending",
-            "created_at": datetime.now().isoformat(timespec="seconds"),
-            "expires_at": (datetime.now() + timedelta(hours=1)).isoformat(timespec="seconds"),
-            "job": job
-        }
-
-        PENDING.write_text(json.dumps(pending_item, indent=2))
-        DISPLAY.write_text(make_display_text(job))
-        notify_pending(job)
-
-        saved_pending += 1
-        print(f"Pending: {job['start_time']} {job['address']}")
-    else:
+    if not (job["start_time"] and job["address"]):
         uncertain += 1
         print("Uncertain, not saved:")
         print(part)
+        continue
+
+    # Duplicate check temporarily disabled for testing.
+    # if job_already_exists(job):
+    #     duplicate += 1
+    #     print(f"Duplicate skipped: {job['start_time']} {job['address']}")
+    #     continue
+
+    pending_item = {
+        "status": "pending",
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "expires_at": (datetime.now() + timedelta(hours=1)).isoformat(timespec="seconds"),
+        "job": job
+    }
+
+    PENDING.write_text(json.dumps(pending_item, indent=2))
+    DISPLAY.write_text(make_display_text(job))
+    notify_pending(job)
+
+    pending_count += 1
+    print(f"Pending: {job['start_time']} {job['address']}")
 
 IMPORTED.unlink(missing_ok=True)
 
-print(f"Done. Pending={saved_pending}, uncertain={uncertain}")
+print(f"Done. Pending={pending_count}, duplicate={duplicate}, uncertain={uncertain}")
