@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from datetime import datetime, timedelta
 
-from travel_time import get_travel_minutes
+from travel_time import get_travel_minutes, save_location_override, get_resolved_address
 
 BASE = Path.home() / "ai_agents"
 WORK = BASE / "work" / "data"
@@ -14,6 +14,7 @@ SHARED = Path.home() / "storage/shared/AI_Agents"
 PENDING = SHARED / "pending_job.json"
 DISPLAY = SHARED / "pending_job_display.txt"
 ALARM_REQUEST = SHARED / "alarm_request.txt"
+TRAVEL_REVIEW = SHARED / "travel_review.txt"
 EDIT_REQUEST = SHARED / "edit_request.txt"
 CONFIRM = SHARED / "confirm.flag"
 REJECT = SHARED / "reject.flag"
@@ -29,9 +30,16 @@ def save_json(path, data):
     path.write_text(json.dumps(data, indent=2))
 
 
-def cleanup():
+def clear_flags_only():
+    CONFIRM.unlink(missing_ok=True)
+    EDIT_REQUEST.unlink(missing_ok=True)
+
+
+def full_cleanup():
     PENDING.unlink(missing_ok=True)
     DISPLAY.unlink(missing_ok=True)
+    ALARM_REQUEST.unlink(missing_ok=True)
+    TRAVEL_REVIEW.unlink(missing_ok=True)
     EDIT_REQUEST.unlink(missing_ok=True)
     CONFIRM.unlink(missing_ok=True)
     REJECT.unlink(missing_ok=True)
@@ -50,20 +58,10 @@ def load_edits():
     return edits
 
 
-def apply_edits(job):
-    edits = load_edits()
-
-    if "date" in edits and edits["date"]:
-        job["date"] = edits["date"]
-
-    if "start_time" in edits and edits["start_time"]:
-        job["start_time"] = edits["start_time"]
-
-    if "address" in edits and edits["address"]:
-        job["address"] = edits["address"]
-
-    if "job_type" in edits and edits["job_type"]:
-        job["job_type"] = edits["job_type"]
+def apply_edits(job, edits):
+    for key in ["date", "start_time", "address", "job_type"]:
+        if key in edits and edits[key]:
+            job[key] = edits[key]
 
     if edits:
         job["edited_at"] = datetime.now().isoformat(timespec="seconds")
@@ -91,18 +89,25 @@ def create_alarm_request(job):
         return
 
     start_dt = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %H:%M")
-    travel_minutes = get_travel_minutes(address) if address else 60
-
+    travel_minutes = get_travel_minutes(address, arrival_dt=start_dt) if address else 60
     alarm_dt = start_dt - timedelta(minutes=travel_minutes + 30)
 
-    seconds_after_midnight = (
-        alarm_dt.hour * 3600 +
-        alarm_dt.minute * 60 +
-        alarm_dt.second
-    )
+    seconds_after_midnight = alarm_dt.hour * 3600 + alarm_dt.minute * 60 + alarm_dt.second
 
     label = f"Leave for work: {address or 'address not detected'}"
     details = f"{job_type} starts at {start_time}. Travel {travel_minutes} min + 30 min buffer."
+
+    resolved_address = get_resolved_address(address) if address else ""
+
+    TRAVEL_REVIEW.write_text(
+        f"Travel estimate\n\n"
+        f"Job address: {address or 'address not detected'}\n"
+        f"Maps destination: {resolved_address or 'address not detected'}\n"
+        f"Travel time: {travel_minutes} minutes\n"
+        f"Arrival time used: {start_dt.strftime('%H:%M')}\n"
+        f"Leave alarm: {alarm_dt.strftime('%H:%M')}\n\n"
+        f"{details}\n"
+    )
 
     ALARM_REQUEST.write_text(
         f"{seconds_after_midnight}\n"
@@ -122,30 +127,52 @@ def create_alarm_request(job):
 
 
 def confirm_pending(reason):
+    if not PENDING.exists():
+        print("No pending job to confirm.")
+        clear_flags_only()
+        return
+
     pending = load_json(PENDING, {})
     pending_items = pending if isinstance(pending, list) else [pending]
 
     jobs = load_json(JOBS_FILE, [])
+    edits = load_edits()
+
     added = 0
+    updated = 0
 
     for item in pending_items:
         job = item.get("job", item)
-        job = apply_edits(job)
+        original_address = job.get("address", "")
 
-        if any(same_job(existing, job) for existing in jobs):
-            print(f"Already saved, skipped: {job.get('start_time')} {job.get('address')}")
-            continue
+        if edits.get("location_override") and original_address:
+            save_location_override(original_address, edits["location_override"])
+            print(f"Saved location override: {original_address} -> {edits['location_override']}")
+
+        job = apply_edits(job, edits)
 
         job["confirmed_at"] = datetime.now().isoformat(timespec="seconds")
         job["confirmation_reason"] = reason
-        jobs.append(job)
+
+        existing_index = None
+        for i, existing in enumerate(jobs):
+            if same_job(existing, job):
+                existing_index = i
+                break
+
+        if existing_index is None:
+            jobs.append(job)
+            added += 1
+        else:
+            jobs[existing_index].update(job)
+            updated += 1
+
         create_alarm_request(job)
-        added += 1
 
     save_json(JOBS_FILE, jobs)
-    cleanup()
+    clear_flags_only()
 
-    print(f"Confirmed {added} job(s). Reason: {reason}")
+    print(f"Confirmed {added} new job(s), updated {updated} existing job(s). Reason: {reason}")
 
 
 if CONFIRM.exists():
@@ -154,7 +181,7 @@ if CONFIRM.exists():
 
 
 if REJECT.exists():
-    cleanup()
+    full_cleanup()
     print("Rejected pending job(s).")
     raise SystemExit
 

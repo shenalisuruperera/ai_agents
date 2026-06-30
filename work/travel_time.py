@@ -2,13 +2,18 @@ import os
 import json
 import requests
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 BASE = Path.home() / "ai_agents"
 ENV_FILE = BASE / ".env"
-CACHE_FILE = BASE / "work" / "data" / "travel_cache.json"
+DATA = BASE / "work" / "data"
+
+CACHE_FILE = DATA / "travel_cache.json"
+OVERRIDES_FILE = DATA / "location_overrides.json"
 
 ORIGIN = "43 Everlasting Boulevard, South Morang VIC, Australia"
+TZ = ZoneInfo("Australia/Melbourne")
 
 
 def load_env():
@@ -29,9 +34,42 @@ def save_json(path, data):
     path.write_text(json.dumps(data, indent=2))
 
 
-def get_cached_minutes(address):
+def resolve_address(address):
+    overrides = load_json(OVERRIDES_FILE, {})
+    lower = address.lower()
+
+    for keyword, real_address in overrides.items():
+        if keyword.lower() in lower:
+            return real_address
+
+    return address
+
+
+def round_arrival_dt(arrival_dt):
+    if not arrival_dt:
+        return None
+
+    if arrival_dt.tzinfo is None:
+        arrival_dt = arrival_dt.replace(tzinfo=TZ)
+
+    minute = 30 if arrival_dt.minute >= 30 else 0
+    return arrival_dt.replace(minute=minute, second=0, microsecond=0)
+
+
+def cache_key(address, arrival_dt=None):
+    resolved = resolve_address(address).lower().strip()
+    rounded = round_arrival_dt(arrival_dt)
+
+    if rounded:
+        return f"{resolved}|arrival={rounded.strftime('%Y-%m-%dT%H:%M')}"
+
+    return resolved
+
+
+def get_cached_minutes(address, arrival_dt=None):
     cache = load_json(CACHE_FILE, {})
-    item = cache.get(address.lower())
+    key = cache_key(address, arrival_dt)
+    item = cache.get(key)
 
     if not item:
         return None
@@ -43,21 +81,55 @@ def get_cached_minutes(address):
     return int(item["travel_minutes"])
 
 
-def save_cache(address, minutes):
+def save_cache(address, minutes, arrival_dt=None):
     cache = load_json(CACHE_FILE, {})
-    cache[address.lower()] = {
-        "address": address,
+    resolved = resolve_address(address)
+    rounded = round_arrival_dt(arrival_dt)
+    key = cache_key(address, arrival_dt)
+
+    cache[key] = {
+        "input_address": address,
+        "resolved_address": resolved,
         "travel_minutes": int(minutes),
+        "arrival_bucket": rounded.strftime("%H:%M") if rounded else None,
+        "arrival_time": rounded.isoformat(timespec="minutes") if rounded else None,
         "last_checked": datetime.now().isoformat(timespec="seconds")
     }
+
     save_json(CACHE_FILE, cache)
 
 
-def get_travel_minutes(address):
+def save_location_override(keyword, real_address):
+    keyword_key = keyword.strip().lower()
+    real_address = real_address.strip()
+
+    overrides = load_json(OVERRIDES_FILE, {})
+    overrides[keyword_key] = real_address
+    save_json(OVERRIDES_FILE, overrides)
+
+    cache = load_json(CACHE_FILE, {})
+
+    bad_keys = [
+        k for k, v in cache.items()
+        if keyword_key in k
+        or real_address.lower() in k
+        or v.get("input_address", "").lower() == keyword_key
+        or v.get("resolved_address", "").lower() == real_address.lower()
+    ]
+
+    for k in bad_keys:
+        cache.pop(k, None)
+
+    save_json(CACHE_FILE, cache)
+
+
+def get_travel_minutes(address, arrival_dt=None):
     if not address:
         return 60
 
-    cached = get_cached_minutes(address)
+    resolved_address = resolve_address(address)
+
+    cached = get_cached_minutes(address, arrival_dt)
     if cached is not None:
         return cached
 
@@ -68,6 +140,8 @@ def get_travel_minutes(address):
         print("GOOGLE_MAPS_API_KEY missing. Using default 60 minutes.")
         return 60
 
+    rounded_arrival = round_arrival_dt(arrival_dt)
+
     url = "https://routes.googleapis.com/directions/v2:computeRoutes"
 
     payload = {
@@ -75,7 +149,7 @@ def get_travel_minutes(address):
             "address": ORIGIN
         },
         "destination": {
-            "address": address + ", Victoria, Australia"
+            "address": resolved_address + ", Victoria, Australia"
         },
         "travelMode": "DRIVE",
         "routingPreference": "TRAFFIC_AWARE",
@@ -83,6 +157,9 @@ def get_travel_minutes(address):
         "languageCode": "en-AU",
         "units": "METRIC"
     }
+
+    if rounded_arrival:
+        payload["arrivalTime"] = rounded_arrival.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
     headers = {
         "Content-Type": "application/json",
@@ -107,8 +184,12 @@ def get_travel_minutes(address):
     seconds = int(duration.replace("s", ""))
     minutes = round(seconds / 60)
 
-    save_cache(address, minutes)
+    save_cache(address, minutes, rounded_arrival)
     return minutes
+
+
+def get_resolved_address(address):
+    return resolve_address(address)
 
 
 if __name__ == "__main__":
