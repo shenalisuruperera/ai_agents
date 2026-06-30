@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 BASE = Path.home() / "ai_agents"
 WORK_DIR = BASE / "work" / "data"
 JOBS_FILE = WORK_DIR / "jobs.json"
-LOCATIONS_FILE = WORK_DIR / "known_locations.json"
 
 
 BAD_ADDRESS_VALUES = {"y", "n", "yes", "no", "confirm", "reject", "ok"}
@@ -57,20 +56,6 @@ def is_bad_address(value):
     return value.strip().lower() in BAD_ADDRESS_VALUES
 
 
-def extract_known_location(text):
-    locations = load_json(LOCATIONS_FILE, {})
-    lower = text.lower()
-
-    for keyword, location in locations.items():
-        keyword = keyword.strip().lower()
-        if not keyword or is_bad_address(location):
-            continue
-        if keyword in lower:
-            return location
-
-    return ""
-
-
 def looks_like_address(line):
     if is_bad_address(line):
         return False
@@ -107,33 +92,13 @@ def extract_address(text):
 
             return ", ".join(address_parts)
 
-    return extract_known_location(text)
+    return ""
 
 
 def ask_edit(label, current):
     print(f"{label}: {current}")
     new_value = input("Press Enter to keep, or type correction: ").strip()
     return new_value if new_value else current
-
-
-def maybe_add_location_keyword(address):
-    if not address or is_bad_address(address):
-        return
-
-    answer = input("\nAdd a keyword for this address/location? y/n: ").strip().lower()
-    if answer != "y":
-        return
-
-    keyword = input("Keyword to detect next time, e.g. air services: ").strip().lower()
-    if not keyword:
-        print("No keyword added.")
-        return
-
-    locations = load_json(LOCATIONS_FILE, {})
-    locations[keyword] = address
-    save_json(LOCATIONS_FILE, locations)
-
-    print(f"Saved keyword: {keyword} -> {address}")
 
 
 def parse_job(text):
@@ -183,7 +148,6 @@ def interactive_main():
 
     if confirm == "y":
         save_job(job)
-        maybe_add_location_keyword(job["address"])
         print("Saved job.")
     else:
         print("Not saved.")
