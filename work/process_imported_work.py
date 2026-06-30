@@ -13,6 +13,11 @@ JOBS_FILE = WORK / "jobs.json"
 SHARED = Path.home() / "storage/shared/AI_Agents"
 PENDING = SHARED / "pending_job.json"
 DISPLAY = SHARED / "pending_job_display.txt"
+ALARM_REQUEST = SHARED / "alarm_request.txt"
+TRAVEL_REVIEW = SHARED / "travel_review.txt"
+EDIT_REQUEST = SHARED / "edit_request.txt"
+CONFIRM = SHARED / "confirm.flag"
+REJECT = SHARED / "reject.flag"
 
 
 def load_json(path, default):
@@ -44,6 +49,11 @@ def job_already_exists(job):
             return True
 
     return False
+
+
+def clear_old_shared_outputs():
+    for path in [ALARM_REQUEST, TRAVEL_REVIEW, EDIT_REQUEST, CONFIRM, REJECT]:
+        path.unlink(missing_ok=True)
 
 
 def notify_pending(job):
@@ -94,11 +104,12 @@ for part in parts:
         print(part)
         continue
 
-    # Duplicate check temporarily disabled for testing.
-    # if job_already_exists(job):
-    #     duplicate += 1
-    #     print(f"Duplicate skipped: {job['start_time']} {job['address']}")
-    #     continue
+    if job_already_exists(job):
+        duplicate += 1
+        print(f"Duplicate skipped: {job['start_time']} {job['address']}")
+        continue
+
+    clear_old_shared_outputs()
 
     pending_item = {
         "status": "pending",

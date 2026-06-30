@@ -20,3 +20,4 @@ archive/
 backup/
 work_messages/
 work/data/known_locations.json
+work/data/location_overrides.json

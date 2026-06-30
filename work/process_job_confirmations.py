@@ -58,9 +58,12 @@ def load_edits():
     return edits
 
 
+def is_bad_value(value):
+    return value.strip().lower() in {"y", "n", "yes", "no", "confirm", "reject", "ok"}
+
 def apply_edits(job, edits):
     for key in ["date", "start_time", "address", "job_type"]:
-        if key in edits and edits[key]:
+        if key in edits and edits[key] and not is_bad_value(edits[key]):
             job[key] = edits[key]
 
     if edits:
@@ -115,15 +118,6 @@ def create_alarm_request(job):
         f"{details}\n"
     )
 
-    reminders = load_json(REMINDERS_FILE, [])
-    reminders.append({
-        "task": label,
-        "date": alarm_dt.strftime("%Y-%m-%d"),
-        "time": alarm_dt.strftime("%H:%M"),
-        "notes": details,
-        "done": False
-    })
-    save_json(REMINDERS_FILE, reminders)
 
 
 def confirm_pending(reason):
