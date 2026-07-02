@@ -4,6 +4,9 @@ import requests
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
+import sys
+sys.path.insert(0, str(Path.home() / 'ai_agents'))
+from shared.notify import notify_error
 
 BASE = Path.home() / "ai_agents"
 ENV_FILE = BASE / ".env"
@@ -137,7 +140,9 @@ def get_travel_minutes(address, arrival_dt=None):
     api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
 
     if not api_key:
-        print("GOOGLE_MAPS_API_KEY missing. Using default 60 minutes.")
+        msg = "GOOGLE_MAPS_API_KEY missing. Using default 60 minutes."
+        print(msg)
+        notify_error("Google Maps key missing", msg)
         return 60
 
     rounded_arrival = round_arrival_dt(arrival_dt)
@@ -170,14 +175,18 @@ def get_travel_minutes(address, arrival_dt=None):
     r = requests.post(url, headers=headers, json=payload, timeout=30)
 
     if r.status_code != 200:
-        print("Google Maps error:", r.status_code, r.text)
+        msg = f"Google Maps error {r.status_code}: {r.text[:180]}"
+        print(msg)
+        notify_error("Google Maps error", msg)
         return 60
 
     data = r.json()
     routes = data.get("routes", [])
 
     if not routes:
-        print("No route found. Using default 60 minutes.")
+        msg = "No route found. Using default 60 minutes."
+        print(msg)
+        notify_error("No route found", msg)
         return 60
 
     duration = routes[0].get("duration", "3600s")

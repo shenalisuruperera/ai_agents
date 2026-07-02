@@ -1,9 +1,12 @@
 import json
-import subprocess
 from pathlib import Path
 from datetime import datetime, timedelta
 
 from work_job_agent import parse_job
+
+import sys
+sys.path.insert(0, str(Path.home() / 'ai_agents'))
+from shared.notify import notify_error
 
 BASE = Path.home() / "ai_agents"
 WORK = BASE / "work" / "data"
@@ -36,32 +39,12 @@ def same_job(a, b):
 
 
 def job_already_exists(job):
-    jobs = load_json(JOBS_FILE, [])
-
-    for existing in jobs:
-        if same_job(existing, job):
-            return True
-
-    if PENDING.exists():
-        pending = load_json(PENDING, {})
-        pending_job = pending.get("job", pending)
-        if same_job(pending_job, job):
-            return True
-
+    # Duplicate detection temporarily disabled during development.
     return False
-
 
 def clear_old_shared_outputs():
     for path in [ALARM_REQUEST, TRAVEL_REVIEW, EDIT_REQUEST, CONFIRM, REJECT]:
         path.unlink(missing_ok=True)
-
-
-def notify_pending(job):
-    subprocess.run([
-        "termux-notification",
-        "--title", "Work job needs confirmation",
-        "--content", f"{job['start_time']} | {job['address']} | {job['job_type']}"
-    ])
 
 
 def make_display_text(job):
@@ -102,6 +85,7 @@ for part in parts:
         uncertain += 1
         print("Uncertain, not saved:")
         print(part)
+        notify_error("Uncertain message", "Could not detect start time or address.")
         continue
 
     if job_already_exists(job):
@@ -120,7 +104,7 @@ for part in parts:
 
     PENDING.write_text(json.dumps(pending_item, indent=2))
     DISPLAY.write_text(make_display_text(job))
-    notify_pending(job)
+    # notify_pending(job)  # Disabled: Automate dialog handles user interaction.
 
     pending_count += 1
     print(f"Pending: {job['start_time']} {job['address']}")
